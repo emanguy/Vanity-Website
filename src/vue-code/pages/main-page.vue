@@ -28,8 +28,10 @@ export default defineComponent({
 
         onMounted(async () => {
             const isNotFirstVisit = window.localStorage.getItem('firstVisit') === 'true';
+            const queryParams = new URLSearchParams(window.location.search);
+            const forceAnimation = queryParams.get('force-intro') !== null;
 
-            if (!isNotFirstVisit) {
+            if (!isNotFirstVisit || forceAnimation) {
                 const animation = [
                     {opacity: 0, transform: 'translateY(10px)'},
                     {opacity: 1, transform: 'translateY(0px)'},
@@ -70,7 +72,7 @@ export default defineComponent({
 
 <style lang="scss">
     #decorated-picture {
-        margin-top: 300px;
+        margin-top: 10%;
     }
 
     .introAnim {
@@ -80,5 +82,13 @@ export default defineComponent({
         &.revealed {
             opacity: 1;
         }
+    }
+
+    h1 > * {
+        font-weight: inherit;
+    }
+
+    p {
+        text-align: center;
     }
 </style>
