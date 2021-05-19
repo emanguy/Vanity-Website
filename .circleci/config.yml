@@ -1,0 +1,39 @@
+version: 2
+orbs:
+    node: circleci/node@4.3.0
+    gcp-cli: circleci/gcp-cli@1.0.0
+jobs:
+    compile-frontend:
+        executor:
+            name: node
+            tag: 14.17.0
+        steps:
+            - checkout
+            - node/install-packages:
+                pkg-manager: yarn
+            - run:
+                name: Build production files
+                command: |
+                    yarn run build
+    rsync-bucket:
+        executor: gcp-cli/google
+        steps:
+            - gcp-cli/initialize:
+                gcloud-service-key: SERVICE_ACCOUNT_KEY
+                google-compute-region: us-east4
+                google-project-id: $PROJECT_ID
+            - checkout
+            - run:
+                name: RSync dist directory with bucket
+                command: |
+                    gsutil ls gs://${BUCKET_NAME}/
+
+workflow:
+    version: 2
+    deploy:
+        jobs:
+            - compile-frontend
+            - rsync-bucket:
+                context: "Personal Website Project"
+                requires: compile-frontend
+
