@@ -12,7 +12,7 @@
 
 <script lang="ts">
 
-import {defineComponent, onMounted, ref} from "vue";
+import {defineComponent, onMounted, ref, Ref} from "vue";
 import DecoratedPicture from '../components/decorated-picture.vue';
 
 export default defineComponent({
@@ -20,9 +20,13 @@ export default defineComponent({
     components: { DecoratedPicture },
     setup() {
         const animatableRefs: {[key: string]: Ref<HTMLSpanElement>} = {
+            // @ts-ignore
             greeting: ref<HTMLSpanElement>(null),
+            // @ts-ignore
             selfRef: ref<HTMLSpanElement>(null),
+            // @ts-ignore
             name: ref<HTMLSpanElement>(null),
+            // @ts-ignore
             content: ref<HTMLSpanElement>(null),
         }
 
