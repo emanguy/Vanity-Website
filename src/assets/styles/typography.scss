@@ -1,0 +1,34 @@
+@mixin bold {
+  font-weight: 700;
+}
+
+@mixin italic {
+  font-style: italic;
+}
+
+* {
+  font-family: 'Raleway', sans-serif;
+  font-weight: 300;
+
+  &.bold {
+    @include bold();
+  }
+
+  &.italic {
+    @include italic();
+  }
+}
+
+i {
+  @include italic();
+}
+
+b {
+  @include bold();
+}
+
+@for $headerSize from 1 to 6 {
+  h#{$headerSize} {
+    @include bold();
+  }
+}
