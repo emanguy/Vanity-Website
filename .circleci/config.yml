@@ -42,7 +42,7 @@ jobs:
           name: RSync dist directory with bucket
           command: |
             cd dist
-            gsutil rsync -d -r . gs://${BUCKET_NAME}/content/
+            gsutil rsync -d -r . gs://${BUCKET_NAME}/
 
 workflows:
   version: 2
