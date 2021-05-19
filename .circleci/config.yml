@@ -18,6 +18,10 @@ jobs:
           name: Build production files
           command: |
             yarn run build
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
 
   rsync-bucket:
     executor: gcp-cli/google
@@ -32,6 +36,8 @@ jobs:
           # From context
           google-project-id: PROJECT_ID
       - checkout
+      - attach_workspace:
+          at: .
       - run:
           name: RSync dist directory with bucket
           command: |
