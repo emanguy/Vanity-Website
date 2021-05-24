@@ -1,25 +1,47 @@
 <template>
-    <div class="flex flex--vertical flex--ai-center full-width">
-        <decorated-picture id="decorated-picture" msg="Hello Vue 3 + TypeScript + Vite" />
+    <!-- noinspection -->
+    <button ref="navMenu" class="material-icons-outlined icon-button introAnim" :class="{revealed: navRevealed}" v-if="isMobile" @click="navExpanded = true">menu</button>
+    <nav ref="nav" class="flex flex--ai-center introAnim" :class="{expanded: navExpanded, revealed: navRevealed}" :aria-hidden="isMobile && !navExpanded">
+        <button class="material-icons-outlined icon-button" v-if="isMobile" @click="navExpanded = false">arrow_back</button>
 
-        <h1><span class="introAnim" ref="greeting">Hi.</span> <span class="introAnim" ref="selfRef">I'm</span> <span class="introAnim" ref="name">Evan Rittenhouse.</span></h1>
+        <decorated-picture class="nav-picture" :animated="false" :image-size-px="75" v-if="isMobile"/>
+        <div id="decoratedPictureTarget" ref="pictureTarget" v-else style="margin-right: 12px"></div>
 
-        <div class="introAnim" ref="content">
+        <a ref="firstLink" href="/" class="link--active-page">Home</a>
+        <a href="/">Personal Projects</a>
+        <a href="/">Links & Social</a>
+    </nav>
+    <main class="flex flex--vertical flex--ai-center full-width">
+        <teleport to="#decoratedPictureTarget" :disabled="isMobile || !pictureInNav">
+            <decorated-picture ref="personalPicture" id="decorated-picture" :image-size-px="personalPictureSizePx" @click="movePictureToNav()"/>
+        </teleport>
+
+        <h1><span class="introAnim" ref="greeting" :class="{revealed: greetingRevealed}">Hi.</span> <span class="introAnim" ref="selfRef" :class="{revealed: selfRefRevealed}">I'm</span> <span class="introAnim" ref="name" :class="{revealed: nameRevealed}">Evan Rittenhouse.</span></h1>
+
+        <div class="introAnim" ref="content" :class="{revealed: contentRevealed}">
             <p>This is my personal website. It's currently under construction, but be sure to check back soon.</p>
         </div>
-    </div>
+    </main>
 </template>
 
 <script lang="ts">
 
 import {defineComponent, onMounted, ref, Ref} from "vue";
 import DecoratedPicture from '../components/decorated-picture.vue';
+import {wait} from "../../ts/async";
 
 export default defineComponent({
     name: 'MainPage',
     components: { DecoratedPicture },
     setup() {
-        const animatableRefs: {[key: string]: Ref<HTMLSpanElement>} = {
+        // Basic page state data
+
+        const navExpanded = ref(false);
+        const isMobile = ref(window.matchMedia('screen and (max-width: 600px)').matches);
+
+        // Fancy intro animation values
+
+        const animatableRefs: {[key: string]: Ref<HTMLElement>} = {
             // @ts-ignore
             greeting: ref<HTMLSpanElement>(null),
             // @ts-ignore
@@ -27,8 +49,105 @@ export default defineComponent({
             // @ts-ignore
             name: ref<HTMLSpanElement>(null),
             // @ts-ignore
-            content: ref<HTMLSpanElement>(null),
-        }
+            content: ref<HTMLDivElement>(null),
+            // @ts-ignore
+            nav: ref<HTMLElement>(null),
+            // @ts-ignore
+            navMenu: ref<HTMLButtonElement>(null),
+        };
+        const elementsRevealed: {[key: string]: Ref<boolean>} = {
+            greetingRevealed: ref(false),
+            selfRefRevealed: ref(false),
+            nameRevealed: ref(false),
+            contentRevealed: ref(false),
+            navRevealed: ref(false),
+        };
+
+        // Navigation away from main page
+
+        const pictureInNav = ref(false);
+        const personalPictureSizePx = ref(200);
+        // @ts-ignore
+        const pictureTarget = ref<HTMLDivElement>(null);
+        // @ts-ignore
+        const firstLink = ref<HTMLAnchorElement>(null);
+        // @ts-ignore
+        const personalPicture = ref<DecoratedPicture>(null);
+
+        const animateContentOut = async () => {
+            const animations = [];
+
+            const fadeOutAnim = [
+                {transform: 'translateY(0)', opacity: 1},
+                {transform: 'translateY(10px)', opacity: 0},
+            ];
+            const duration = 250;
+            animations.push(animatableRefs.content.value.animate(fadeOutAnim, duration).finished
+                    .then(() => elementsRevealed.contentRevealed.value = false));
+            animations.push(animatableRefs.greeting.value.animate(fadeOutAnim, duration).finished
+                    .then(() => elementsRevealed.greetingRevealed.value = false));
+            animations.push(animatableRefs.selfRef.value.animate(fadeOutAnim, duration).finished
+                    .then(() => elementsRevealed.selfRefRevealed.value = false));
+            animations.push(animatableRefs.name.value.animate(fadeOutAnim, duration).finished
+                    .then(() => elementsRevealed.nameRevealed.value = false));
+
+            return Promise.all(animations);
+        };
+
+        const movePictureToNav = async () => {
+            await animateContentOut();
+            await personalPicture.value.switchToStaticBorder();
+            personalPictureSizePx.value = 50;
+            await wait(250);
+
+            const pictureBoundingRect: DOMRect = personalPicture.value.$el.getBoundingClientRect();
+            const linkBoundingRect = pictureTarget.value.getBoundingClientRect();
+
+            const xTranslation = linkBoundingRect.x - pictureBoundingRect.x;
+            const yTranslation = linkBoundingRect.y - pictureBoundingRect.y - 29;
+
+            console.log(xTranslation);
+            console.log(yTranslation);
+
+            const animations = [];
+
+            // Shove the links to the side to make room for my picture
+            animations.push(firstLink.value.animate([
+                {margin: '0 8px 0 8px'},
+                {margin: '0 8px 0 66px'},
+            ], {
+                duration: 750,
+                easing: 'ease-in-out',
+            }).finished);
+
+            // Run X and Y translations separately but composited together to get a nice sideways curve up into the intended destination
+            animations.push(personalPicture.value.$el.animate([
+                {transform: 'translateX(0)'},
+                {transform: `translateX(${xTranslation * 0.5}px)`, offset: 0.25},
+                {transform: `translateX(${xTranslation * 0.9}px)`, offset: 0.5},
+                {transform: `translateX(${xTranslation}px)`},
+            ], {
+                duration: 750,
+                easing: 'ease-in-out',
+            }).finished);
+            animations.push(personalPicture.value.$el.animate([
+                {transform: 'translateY(0)'},
+                {transform: `translateY(${yTranslation * 0.5}px)`, offset: 0.75},
+                {transform: `translateY(${yTranslation * 0.75}px)`, offset: 0.9},
+                {transform: `translateY(${yTranslation}px)`},
+            ], {
+                duration: 750,
+                offset: 500,
+                easing: 'ease-in-out',
+                composite: 'accumulate',
+            }).finished);
+
+            // Wait for those animations to run and then teleport my image to the nav section
+            await Promise.all(animations);
+            pictureInNav.value = true;
+        };
+
+        // Hooks
 
         onMounted(async () => {
             const isNotFirstVisit = window.localStorage.getItem('firstVisit') === 'true';
@@ -40,59 +159,139 @@ export default defineComponent({
                     {opacity: 0, transform: 'translateY(10px)'},
                     {opacity: 1, transform: 'translateY(0px)'},
                 ];
+                const topAnimation = [
+                    {opacity: 0, transform: 'translateY(-10px)'},
+                    {opacity: 1, transform: 'translateY(0px)'},
+                ];
 
+                // "Hi, I'm Evan Rittenhouse"
                 const greetingAnim = animatableRefs.greeting.value.animate(animation, {
                     duration: 250,
-                }).finished.then(() => animatableRefs.greeting.value.classList.add('revealed'));
+                }).finished.then(() => elementsRevealed.greetingRevealed.value = true);
                 const selfRefAnim = animatableRefs.selfRef.value.animate(animation, {
                     duration: 250,
                     delay: 1000,
-                }).finished.then(() => animatableRefs.selfRef.value.classList.add('revealed'));
+                }).finished.then(() => elementsRevealed.selfRefRevealed.value = true);
                 const nameAnim = animatableRefs.name.value.animate(animation, {
                     duration: 250,
                     delay: 1100,
-                }).finished.then(() => animatableRefs.name.value.classList.add('revealed'));
+                }).finished.then(() => elementsRevealed.nameRevealed.value = true);
 
                 await Promise.all([greetingAnim, selfRefAnim, nameAnim]);
-                await animatableRefs.content.value.animate(animation, {
+
+                // Rest of the page content flies in
+                const bodyAnim = animatableRefs.content.value.animate(animation, {
                     duration: 250,
                     delay: 500,
-                }).finished;
-                animatableRefs.content.value.classList.add('revealed');
+                }).finished.then(() => elementsRevealed.contentRevealed.value = true);
+                const navAnim = animatableRefs.nav.value.animate(topAnimation, {
+                    duration: 250,
+                    delay: 500,
+                }).finished.then(() => elementsRevealed.navRevealed.value = true);
 
+                const finalAnimations: Promise<any>[] = [bodyAnim, navAnim];
+
+                // Animate the menu button in on mobile
+                if (isMobile.value) {
+                    finalAnimations.push(animatableRefs.navMenu.value.animate(topAnimation, {
+                        duration: 250,
+                        delay: 500,
+                    }).finished);
+                }
+
+                await Promise.all(finalAnimations);
+
+                // Stash that we already did the fancy animation once
                 window.localStorage.setItem('firstVisit', 'true');
             } else {
-                for (let refName of Object.keys(animatableRefs)) {
-                    animatableRefs[refName].value.classList.add('revealed');
+                for (let refName of Object.keys(elementsRevealed)) {
+                    elementsRevealed[refName].value = true;
                 }
             }
         });
 
-        return {...animatableRefs};
+        return {
+            isMobile,
+            navExpanded,
+
+            pictureInNav,
+            firstLink,
+            personalPicture,
+            personalPictureSizePx,
+            pictureTarget,
+            movePictureToNav,
+
+            ...animatableRefs,
+            ...elementsRevealed,
+        };
     },
 });
 
 </script>
 
 <style lang="scss">
-    #decorated-picture {
-        margin-top: 10%;
-    }
+@media screen and (max-width: 600px) {
+    nav {
+        flex-direction: column !important;
+        align-items: start !important;
+        background-color: #cecabf;
+        position: fixed;
+        width: 80%;
+        height: 100% !important;
+        top: 0;
+        left: -80%;
+        z-index: 1;
+        padding: 16px;
+        box-sizing: border-box;
 
-    .introAnim {
-        display: inline-block;
-        opacity: 0;
+        transition: left 250ms;
 
-        &.revealed {
-            opacity: 1;
+        .nav-picture {
+            align-self: center;
+            margin: 8px;
+        }
+
+        :nth-child(3) {
+            margin-top: 32px;
+        }
+
+        &.expanded {
+            left: 0;
+            box-shadow: 8px 0 12px 4px rgba(39, 39, 39, 0.15);
         }
     }
+}
 
-    h1 > * {
-        font-weight: inherit;
-    }
+.icon-button {
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    margin-top: 8px;
+}
 
-    p {
-        text-align: center;
+nav {
+    flex-direction: row;
+    height: 64px;
+}
+
+#decorated-picture {
+    margin-top: 10%;
+}
+
+.introAnim {
+    display: inline-block;
+    opacity: 0;
+
+    &.revealed {
+        opacity: 1;
     }
+}
+
+h1 > * {
+    font-weight: inherit;
+}
+
+p {
+    text-align: center;
+}
 </style>

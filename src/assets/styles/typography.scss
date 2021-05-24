@@ -27,6 +27,41 @@ b {
   @include bold();
 }
 
+a {
+  @include bold();
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color 250ms, transform 250ms, border-bottom-width 250ms;
+  color: #241d15;
+  margin: 6px;
+  padding-left: 2px;
+  padding-right: 2px;
+  border-bottom: 0 solid #241d15;
+  box-sizing: border-box;
+
+  &:hover {
+    transform: translateY(2px);
+    color: #483a2a;
+    border-bottom: 2px solid #483a2a;
+  }
+
+  &:active {
+    color: #241d15;
+  }
+
+  &.link--no-uppercase {
+    text-transform: none;
+  }
+
+  &.link--active-page {
+    border-bottom: 2px solid #241d15;
+
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
 @for $headerSize from 1 to 6 {
   h#{$headerSize} {
     @include bold();
