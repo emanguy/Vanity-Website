@@ -12,6 +12,7 @@
         <a href="/">Links & Social</a>
     </nav>
     <main class="flex flex--vertical flex--ai-center full-width">
+        <span id="decoratedPictureOrigin" ref="decoratedPictureOrigin" v-if="determiningAnimationTarget"></span>
         <teleport to="#decoratedPictureTarget" :disabled="isMobile || !pictureInNav">
             <decorated-picture ref="personalPicture" id="decorated-picture" :image-size-px="personalPictureSizePx" @click="movePictureToNav()"/>
         </teleport>
@@ -38,9 +39,12 @@ export default defineComponent({
 
         const navExpanded = ref(false);
         const isMobile = ref(window.matchMedia('screen and (max-width: 600px)').matches);
+        const determiningAnimationTarget = ref(false);
 
         // Fancy intro animation values
 
+        // @ts-ignore
+        const decoratedPictureOrigin = ref<HTMLSpanElement>(null);
         const animatableRefs: {[key: string]: Ref<HTMLElement>} = {
             // @ts-ignore
             greeting: ref<HTMLSpanElement>(null),
@@ -63,7 +67,7 @@ export default defineComponent({
             navRevealed: ref(false),
         };
 
-        // Navigation away from main page
+        // Navigation toward and away from main page
 
         const pictureInNav = ref(false);
         const personalPictureSizePx = ref(200);
@@ -74,25 +78,39 @@ export default defineComponent({
         // @ts-ignore
         const personalPicture = ref<DecoratedPicture>(null);
 
-        const animateContentOut = async () => {
+        const animateContent = async (contentAnimation: Array<Keyframe>) => {
             const animations = [];
 
+            const duration = 250;
+            animations.push(animatableRefs.content.value.animate(contentAnimation, duration).finished
+                .then(() => elementsRevealed.contentRevealed.value = false));
+            animations.push(animatableRefs.greeting.value.animate(contentAnimation, duration).finished
+                .then(() => elementsRevealed.greetingRevealed.value = false));
+            animations.push(animatableRefs.selfRef.value.animate(contentAnimation, duration).finished
+                .then(() => elementsRevealed.selfRefRevealed.value = false));
+            animations.push(animatableRefs.name.value.animate(contentAnimation, duration).finished
+                .then(() => elementsRevealed.nameRevealed.value = false));
+
+            return Promise.all(animations);
+        };
+
+        const animateContentOut = async () => {
             const fadeOutAnim = [
                 {transform: 'translateY(0)', opacity: 1},
                 {transform: 'translateY(10px)', opacity: 0},
             ];
-            const duration = 250;
-            animations.push(animatableRefs.content.value.animate(fadeOutAnim, duration).finished
-                    .then(() => elementsRevealed.contentRevealed.value = false));
-            animations.push(animatableRefs.greeting.value.animate(fadeOutAnim, duration).finished
-                    .then(() => elementsRevealed.greetingRevealed.value = false));
-            animations.push(animatableRefs.selfRef.value.animate(fadeOutAnim, duration).finished
-                    .then(() => elementsRevealed.selfRefRevealed.value = false));
-            animations.push(animatableRefs.name.value.animate(fadeOutAnim, duration).finished
-                    .then(() => elementsRevealed.nameRevealed.value = false));
 
-            return Promise.all(animations);
+            await animateContent(fadeOutAnim);
         };
+
+        const animateContentIn = async () => {
+            const fadeInAnim = [
+                {transform: 'translateY(10px)', opacity: 0},
+                {transform: 'translateY(0)', opacity: 1},
+            ];
+
+            await animateContent(fadeInAnim);
+        }
 
         const movePictureToNav = async () => {
             await animateContentOut();
@@ -105,9 +123,6 @@ export default defineComponent({
 
             const xTranslation = linkBoundingRect.x - pictureBoundingRect.x;
             const yTranslation = linkBoundingRect.y - pictureBoundingRect.y - 29;
-
-            console.log(xTranslation);
-            console.log(yTranslation);
 
             const animations = [];
 
@@ -145,6 +160,67 @@ export default defineComponent({
             // Wait for those animations to run and then teleport my image to the nav section
             await Promise.all(animations);
             pictureInNav.value = true;
+        };
+
+        const movePictureFromNav = async () => {
+            // First, estimate where the image is going to end up in the DOM
+            determiningAnimationTarget.value = true;
+            // Let the DOM update
+            await new Promise(resolve => requestAnimationFrame(resolve));
+
+            // Determine how far from the image's current location it'll need to move to get the animation to line up
+            const {x: sourceX, y: sourceY} = personalPicture.value.$el.getBoundingClientRect();
+            const {x: destinationX, y: destinationY} = decoratedPictureOrigin.value.getBoundingClientRect();
+
+            const xTranslation = destinationX - sourceX;
+            const yTranslation = destinationY - sourceY;
+
+            // Now we don't need the placeholder element anymore
+            determiningAnimationTarget.value = false;
+
+            // Run the animation
+            const animations = [];
+
+            // Shove the links back into their original position
+            animations.push(firstLink.value.animate([
+                {margin: '0 8px 0 66px'},
+                {margin: '0 8px 0 8px'},
+            ], {
+                duration: 750,
+                easing: 'ease-in-out',
+            }).finished);
+
+            // Run X and Y translations separately but composited together to get a nice sideways curve up into the intended destination
+            animations.push(personalPicture.value.$el.animate([
+                {transform: 'translateX(0)'},
+                {transform: `translateX(${xTranslation * 0.5}px)`, offset: 0.25},
+                {transform: `translateX(${xTranslation * 0.9}px)`, offset: 0.5},
+                {transform: `translateX(${xTranslation}px)`},
+            ], {
+                duration: 750,
+                easing: 'ease-in-out',
+            }).finished);
+            animations.push(personalPicture.value.$el.animate([
+                {transform: 'translateY(0)'},
+                {transform: `translateY(${yTranslation * 0.5}px)`, offset: 0.75},
+                {transform: `translateY(${yTranslation * 0.75}px)`, offset: 0.9},
+                {transform: `translateY(${yTranslation}px)`},
+            ], {
+                duration: 750,
+                offset: 500,
+                easing: 'ease-in-out',
+                composite: 'accumulate',
+            }).finished);
+
+            // Wait for those animations to run and then teleport my image out of the nav section
+            await Promise.all(animations);
+            pictureInNav.value = false;
+
+            // Size the image back to normal, then animate in the content
+            personalPictureSizePx.value = 200;
+            await wait(250);
+            await personalPicture.value.switchToAnimatedBorder();
+            await animateContentIn();
         };
 
         // Hooks
@@ -213,6 +289,7 @@ export default defineComponent({
         return {
             isMobile,
             navExpanded,
+            determiningAnimationTarget,
 
             pictureInNav,
             firstLink,
@@ -220,7 +297,9 @@ export default defineComponent({
             personalPictureSizePx,
             pictureTarget,
             movePictureToNav,
+            movePictureFromNav,
 
+            decoratedPictureOrigin,
             ...animatableRefs,
             ...elementsRevealed,
         };
@@ -272,6 +351,11 @@ export default defineComponent({
 nav {
     flex-direction: row;
     height: 64px;
+}
+
+#decoratedPictureOrigin {
+    margin-top: 10%;
+    width: 230px;
 }
 
 #decorated-picture {
